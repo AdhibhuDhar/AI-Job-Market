@@ -1,4 +1,9 @@
+REQUIRED_WEIGHT=80
+PREFERRED_WEIGHT=20
+
+
 from app.schemas.candidate_schema import CandidateSchema
+from app.schemas.job_scehma import JobSchema
 
 def flatten_candidate_skills(
         candidate:CandidateSchema
@@ -9,7 +14,7 @@ def flatten_candidate_skills(
         for skill in candidate.skills.languages #normalise once,lookup forever
     )
     all_skills.update(
-        skill.lower
+        skill.lower()
         for skill in candidate.skills.frameworks
     )
     all_skills.update(
@@ -40,8 +45,9 @@ def flatten_candidate_skills(
     
 
 def calculate_skill_score(
-        candidate_skills:list[str],
-        required_skills:list[str]
+        candidate_skills:set[str],
+        required_skills:list[str],
+        allow_empty: bool=False
 ):
     normalized_required={
         skill.lower() for skill in required_skills
@@ -61,4 +67,30 @@ def calculate_skill_score(
         "matched_skills":list(matched_skills),
         "missing_skills":list(missing_skills)
     }
+def calculate_ats_score(
+        candidate:CandidateSchema,
+        job:JobSchema
+):
+    candidate_skills=flatten_candidate_skills(
+        candidate
+    )
+    required_result=calculate_skill_score(
+        candidate_skills,
+        job.required_skills
+    )
+    preferred_result=calculate_skill_score(
+        candidate_skills,
+        job.preferred_skills,
+        allow_empty=True
+    )
+    if len(job.preferred_skills)>0:
+        base_score=(
+            required_result["score"]*[REQUIRED_WEIGHT/100]
+        )
+        bonus_score=(
+            preferred_result["score"]*[PREFERRED_WEIGHT/100]
+        )
+        final_score=min(100,base_score+bonus_score)
+    else:
+        final_score=required_result["score"]
 
